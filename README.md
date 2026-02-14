@@ -1,5 +1,9 @@
 # Peeler
 
+[![CI](https://github.com/pappadf/peeler/actions/workflows/ci.yml/badge.svg)](https://github.com/pappadf/peeler/actions/workflows/ci.yml)
+[![C99](https://img.shields.io/badge/C-99-blue.svg)](https://en.wikipedia.org/wiki/C99)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 **Peeler** is a small C library for unpacking legacy Macintosh compression and archive formats.
 
 Just as you peel an orange to get to the fruit inside, Peeler unpacks old Mac archives to extract their contents — `.sit` (StuffIt), `.cpt` (Compact Pro), `.hqx` (BinHex), and `.bin` (MacBinary) files.
