@@ -602,6 +602,7 @@ static bool parse_classic(const uint8_t *blob, size_t blob_len,
         uint8_t dm = hdr[1];
 
         // sit.md § 4.4 — folder start marker (0x20)
+        // Folder markers do NOT count toward file_count (sit.md § 4.7).
         if (rm == SIT_FOLDER_START || dm == SIT_FOLDER_START) {
             uint8_t nlen = hdr[2];
             if (depth < SIT_MAX_DEPTH && nlen < 64) {
@@ -610,15 +611,14 @@ static bool parse_classic(const uint8_t *blob, size_t blob_len,
                 depth++;
             }
             cursor += SIT_ENTRY_HDR_SIZE;
-            done++;
             continue;
         }
 
         // sit.md § 4.4 — folder end marker (0x21)
+        // Folder markers do NOT count toward file_count (sit.md § 4.7).
         if (rm == SIT_FOLDER_END || dm == SIT_FOLDER_END) {
             if (depth > 0) depth--;
             cursor += SIT_ENTRY_HDR_SIZE;
-            done++;
             continue;
         }
 
