@@ -458,6 +458,12 @@ Entries with `data_uncomp_len == 0xFFFFFFFF` are special markers — they do
 not represent extractable files or folders.  Both folder entries and
 non-folder entries can have this marker value.
 
+**Important:** Marker entries do **not** carry a header 2 block.  The marker
+check must be performed immediately after reading header 1, **before** any
+attempt to access header 2.  A marker entry at the end of an archive may have
+no bytes following header 1, so accessing header 2 would read past the
+archive boundary.
+
 - **Folder with `0xFFFFFFFF`:** The entry is skipped.  The running entry
   count is incremented by 1 (as a compensating adjustment, since the entry
   itself was already counted).  Traversal advances to the byte offset
@@ -479,20 +485,20 @@ contain linked-list pointers:
    (offset 92).
 
 2. **Read header 1** at the cursor.  Validate the `0xA5A5A5A5` magic, version
-   byte, and header CRC.
+   byte, and header CRC.  **Check for the `0xFFFFFFFF` special marker
+   (§5.6) before accessing header 2.**
 
 3. **Folder entries** (flags bit 6 set):
    - If `data_uncomp_len == 0xFFFFFFFF`: skip (adjust count, advance past
-     header 1).
-   - Otherwise: record the folder in a directory map (up to 32 entries),
-     storing its offset and computed path.  Add the folder's child count
-     to the remaining entry count.  Advance cursor past **both** header 1
-     **and** header 2 (into the folder's children) and recurse.  Folder
-     entries carry a full header 2 block identical in layout to file entries;
-     this block must be skipped even though its metadata is not used.
+     header 1).  Do not access header 2.
+   - Otherwise: parse header 2, record the folder in a directory map (up to
+     32 entries), storing its offset and computed path.  Add the folder's
+     child count to the remaining entry count.  Advance cursor past **both**
+     header 1 **and** header 2 (into the folder's children) and recurse.
 
 4. **File entries:**
-   - If `data_uncomp_len == 0xFFFFFFFF`: skip.
+   - If `data_uncomp_len == 0xFFFFFFFF`: skip (advance past header 1).
+     Do not access header 2.
    - Otherwise: parse header 2, extract fork metadata, decompress forks.
      Decrement the remaining entry count.  Advance cursor past the fork
      data (to `payload_start + rsrc_comp_len + data_comp_len`).
