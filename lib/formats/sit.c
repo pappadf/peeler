@@ -802,6 +802,7 @@ static bool parse_sit5(const uint8_t *blob, size_t blob_len,
         uint32_t d_packed_len = rd32be(h1 + 38);
         uint16_t d_crc        = rd16be(h1 + 42);
 
+
         // Read entry name (starts at byte 48 of header 1)
         char namebuf[256];
         {
@@ -810,6 +811,16 @@ static bool parse_sit5(const uint8_t *blob, size_t blob_len,
             if ((size_t)cursor + 48 + cl > avail) cl = avail - (size_t)cursor - 48;
             memcpy(namebuf, h1 + 48, cl);
             namebuf[cl] = '\0';
+        }
+
+        // sit.md § 5.6 "Special Markers" — 0xFFFFFFFF entries are skipped
+        // before header 2 parsing, since header 2 may not exist.
+        if (d_raw_len == 0xFFFFFFFF) {
+            // sit.md § 5.6 — folder markers: increment remaining by 1
+            if (flags & 0x40)
+                remaining++;
+            cursor = h2_off;
+            continue;
         }
 
         // Parse header 2
@@ -851,14 +862,6 @@ static bool parse_sit5(const uint8_t *blob, size_t blob_len,
         if (flags & 0x40) {
             uint16_t child_count = rd16be(h1 + 46);
 
-            // sit.md § 5.6 "Special Markers" — 0xFFFFFFFF folders are skipped
-            if (d_raw_len == 0xFFFFFFFF) {
-                remaining++;
-                cursor = h2_off;
-                remaining--;
-                continue;
-            }
-
             // Build parent path
             char ppath[512] = "";
             if (parent_off != 0) {
@@ -885,12 +888,6 @@ static bool parse_sit5(const uint8_t *blob, size_t blob_len,
             // sit.md § 5.7 — add child count, advance into children
             remaining += child_count;
             cursor = (uint32_t)(payload_ptr - base);
-            continue;
-        }
-
-        // sit.md § 5.6 "Special Markers" — skip 0xFFFFFFFF non-folder entries
-        if (d_raw_len == 0xFFFFFFFF) {
-            cursor = h2_off;
             continue;
         }
 
