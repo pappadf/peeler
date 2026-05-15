@@ -40,6 +40,7 @@ LIB_SRCS  = lib/err.c      \
 FMT_SRCS  = lib/formats/hqx.c   \
             lib/formats/bin.c    \
             lib/formats/sit.c    \
+            lib/formats/sit3.c   \
             lib/formats/sit13.c  \
             lib/formats/sit15.c  \
             lib/formats/cpt.c
