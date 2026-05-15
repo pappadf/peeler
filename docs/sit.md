@@ -185,7 +185,7 @@ The archive begins with a 22-byte header:
 | Offset | Size | Field | Description |
 |--------|------|-------|-------------|
 | 0 | 4 | `magic1` | One of the 9 recognized signatures (§4.1). |
-| 4 | 2 | `file_count` | Number of file/folder entries in the archive. Used to control the sequential iteration loop. |
+| 4 | 2 | `file_count` | Number of top-level entries in the archive. A folder (including all its nested contents) counts as one entry. Used to control the sequential iteration loop. See §4.6 and §4.7. |
 | 6 | 4 | `total_size` | Total archive size in bytes (may be used for validation). |
 | 10 | 4 | `magic2` | Always `rLau` (`0x724C6175`). |
 | 14 | 1 | `version` | Version byte.  Semantics are unknown; preserved verbatim. |
@@ -270,23 +270,34 @@ Classic StuffIt encodes folder hierarchy using paired start/end markers:
 Folder markers appear in either the resource or data method byte — either one
 being 0x20 or 0x21 triggers the corresponding action.
 
-**Folder markers do not contribute to `file_count`** — they are not counted
-as "files" in the archive header.  However, they are encountered during
-sequential iteration and must be processed to maintain the correct directory
-context.
+**`file_count` is a count of top-level entries** — a folder (open through
+close, with any nesting inside) counts as exactly one top-level entry,
+regardless of how many files or sub-folders it contains.  The folder-start
+and folder-end markers themselves are not separately tallied; the folder
+becomes "consumed" when its outermost folder-end is reached and the depth
+returns to zero.  Files at the top level (depth 0) each count as one
+top-level entry as well.
+
+A flat archive of N files thus reports `file_count = N`.  An archive
+consisting of a single root folder (regardless of how many files are inside)
+reports `file_count = 1`.
 
 ### 4.7  Classic Iteration Rules
 
-Extraction proceeds sequentially from the first header (offset 22):
+Extraction proceeds sequentially from the first header (offset 22).  The
+iterator maintains a `depth` counter (initially 0) and a `done` counter of
+top-level entries consumed.  At each step:
 
 1. Read the 112-byte header at the current cursor position.
 2. Check the method bytes:
    - If either is 0x20 (folder start): push folder name onto the stack,
-     advance cursor by 112, continue.
-   - If either is 0x21 (folder end): pop one level, advance cursor by 112,
-     continue.
+     increment `depth`, advance cursor by 112, continue.
+   - If either is 0x21 (folder end): if `depth > 0`, decrement `depth`;
+     advance cursor by 112; if `depth` is now 0, increment `done` (a
+     top-level folder has just been fully consumed); continue.
    - If `method_raw & 0xE0` is non-zero and neither 0x20 nor 0x21: skip
-     this entry (advance cursor by 112), continue.
+     this entry (advance cursor by 112); if `depth == 0`, increment `done`;
+     continue.
 3. For a regular file: extract the low nibble of each method byte as the
    compression method ID.  Read fork metadata from the header.
 4. Locate fork data: resource fork starts at `cursor + 112`, data fork starts
@@ -294,14 +305,17 @@ Extraction proceeds sequentially from the first header (offset 22):
 5. Advance cursor to `cursor + 112 + rsrc_comp_len + data_comp_len`.
 6. Build the full file path by prepending the current folder stack.
 7. Decompress each non-empty fork, verify CRC (except for method 15).
+8. If `depth == 0`, increment `done` (a top-level file has been consumed).
+   Files nested inside a folder do not increment `done`.
 
 **Folder stack:** The implementation maintains a stack of up to 10 nesting
 levels, with each level holding a name of up to 63 bytes (matching the
 maximum name length in the header).  Archives with deeper nesting than 10
 levels may not be fully supported.
 
-Continue iteration until `file_count` entries have been consumed.  Validate
-that compressed fork spans lie entirely within the archive bounds.
+Continue iteration until `done == file_count` (all top-level entries have
+been consumed) or the cursor exhausts the available data.  Validate that
+compressed fork spans lie entirely within the archive bounds.
 
 ---
 

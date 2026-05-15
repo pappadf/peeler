@@ -602,30 +602,33 @@ static bool parse_classic(const uint8_t *blob, size_t blob_len,
         uint8_t dm = hdr[1];
 
         // sit.md § 4.4 — folder start marker (0x20)
-        // Folder markers do NOT count toward file_count (sit.md § 4.7).
+        // sit.md § 4.7 — file_count counts top-level entries only; a folder
+        // (open through close) is one top-level entry regardless of contents.
+        // The structural markers themselves do not increment `done`; the
+        // outermost folder-end does (when depth pops back to 0).
         if (rm == SIT_FOLDER_START || dm == SIT_FOLDER_START) {
             uint8_t nlen = hdr[2];
             if (depth < SIT_MAX_DEPTH && nlen < 64) {
                 memcpy(dirs[depth], hdr + 3, nlen);
                 dirs[depth][nlen] = '\0';
-                depth++;
             }
+            if (depth < SIT_MAX_DEPTH) depth++;
             cursor += SIT_ENTRY_HDR_SIZE;
             continue;
         }
 
         // sit.md § 4.4 — folder end marker (0x21)
-        // Folder markers do NOT count toward file_count (sit.md § 4.7).
         if (rm == SIT_FOLDER_END || dm == SIT_FOLDER_END) {
             if (depth > 0) depth--;
             cursor += SIT_ENTRY_HDR_SIZE;
+            if (depth == 0) done++;
             continue;
         }
 
         // sit.md § 4.4 — skip entries with unknown high bits
         if ((rm & 0xE0) || (dm & 0xE0)) {
             cursor += SIT_ENTRY_HDR_SIZE;
-            done++;
+            if (depth == 0) done++;
             continue;
         }
 
@@ -701,7 +704,7 @@ static bool parse_classic(const uint8_t *blob, size_t blob_len,
 
         // Advance past both fork data regions
         cursor = (uint32_t)((size_t)(data_ptr - base) + dclen);
-        done++;
+        if (depth == 0) done++;
     }
 
     return true;
