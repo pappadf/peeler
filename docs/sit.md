@@ -540,7 +540,7 @@ the low 4 bits of the method byte.  The following methods are defined:
 | 0 | None | Implemented | Raw copy — no compression. |
 | 1 | RLE90 | Implemented | Escape-based run-length encoding. |
 | 2 | LZW | Implemented | StuffIt variant of LZW (14-bit max, block mode). |
-| 3 | Static Huffman | Not implemented | Historical classic method. |
+| 3 | Static Huffman | Implemented | Original Raymond Lau (1987) per-byte static Huffman.  See `sit3.md`. |
 | 5 | LZAH | Not implemented | Used by SIT5; not publicly documented. |
 | 8 | LZMW (Miller–Wegman) | Not implemented | Used by SIT5; not publicly documented. |
 | 13 | SIT13 | Implemented | LZSS + dual Huffman trees.  See separate specification. |

@@ -29,6 +29,10 @@
 // Forward Declarations — sit13 / sit15 helpers
 // ============================================================================
 
+// Decompress a method-3 fork into a freshly allocated buffer.
+peel_buf_t peel_sit3(const uint8_t *src, size_t len, size_t uncomp_len,
+                     peel_err_t **err);
+
 // Decompress a method-13 fork into a freshly allocated buffer.
 peel_buf_t peel_sit13(const uint8_t *src, size_t len, size_t uncomp_len,
                       peel_err_t **err);
@@ -433,6 +437,21 @@ static peel_buf_t decompress_fork(const sit_fork_info_t *fi, peel_err_t **err) {
     uint16_t expect_crc = fi->crc;
     uint8_t  method     = fi->method;
     const uint8_t *src  = fi->data;
+
+    // sit.md § 10.A "Method 3" — delegated to sit3.c (static Huffman)
+    if (method == 3) {
+        peel_buf_t result = peel_sit3(src, packed_len, raw_len, err);
+        if (*err) return (peel_buf_t){0};
+        // sit.md § 6.3 "CRC Verification Rule" — verify CRC over decompressed
+        uint16_t actual = sit_crc(result.data, result.size);
+        if (actual != expect_crc) {
+            *err = make_err("SIT: fork CRC mismatch (expected 0x%04X, got 0x%04X)",
+                            expect_crc, actual);
+            peel_free(&result);
+            return (peel_buf_t){0};
+        }
+        return result;
+    }
 
     // sit.md § 10 "Method 13" — delegated to sit13.c
     if (method == 13) {
